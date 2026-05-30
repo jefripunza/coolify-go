@@ -29,7 +29,7 @@ func main() {
 	// Initialize the Coolify API client with credentials from .env.
 	client := coolify.NewClient(coolify_url, coolify_key)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	// 1. Query System version and status
