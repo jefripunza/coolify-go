@@ -1,32 +1,13 @@
 package main
 
 import (
-	"os"
-	"strings"
+	"github.com/joho/godotenv"
 )
 
-// parses the .env file manually from the local directory or its parent directory.
+// parses the .env file using the godotenv library from local or parent directory.
 func init() {
-	// Try loading from the current working directory first
-	content, err := os.ReadFile(".env")
-	if err != nil {
-		// Fallback to parent directory (useful if running from inside the example/ folder)
-		content, err = os.ReadFile("../.env")
-		if err != nil {
-			return
-		}
-	}
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			val := strings.TrimSpace(parts[1])
-			os.Setenv(key, val)
-		}
+	// Try loading from .env in current directory, fallback to parent directory if it fails
+	if err := godotenv.Load(".env"); err != nil {
+		_ = godotenv.Load("../.env")
 	}
 }
