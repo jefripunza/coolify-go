@@ -2,14 +2,21 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"coolify"
 )
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 func main() {
 	coolify_url := os.Getenv("COOLIFY_URL")
@@ -80,8 +87,13 @@ func main() {
 
 	// 4. Demonstrating custom Docker Image application creation
 	timestamp := time.Now().Unix()
-	appName := fmt.Sprintf("vps-ubuntu-server-%d", timestamp)
-	domain := fmt.Sprintf("https://vps-test-%d.%s", timestamp, web_host)
+	appName := fmt.Sprintf("vps-qemu-server-%d", timestamp)
+
+	domain_terminal := fmt.Sprintf("https://vps-terminal-%d.%s", timestamp, web_host)
+	domain_coolify := fmt.Sprintf("https://vps-coolify-%d.%s:8000", timestamp, web_host)
+
+	// join string using comma
+	domain := strings.Join([]string{domain_terminal, domain_coolify}, ",")
 
 	// Query the Docker Hub repository for the latest version tag.
 	latestVersion := "latest" // Fallback default version
@@ -94,39 +106,35 @@ func main() {
 		fmt.Printf("   Successfully retrieved latest version tag: %s\n", latestVersion)
 	}
 
-	composeContent := fmt.Sprintf(`version: '3.8'
+	ttydOutPort := getEnv("TTYD_OUT_PORT", "6080")
+	ttydUser := getEnv("TTYD_USER", "ubuntu")
+	ttydPassword := getEnv("TTYD_PASSWORD", "ubuntu")
+	sshOutPort := getEnv("SSH_OUT_PORT", "2222")
+	sshUser := getEnv("SSH_USER", "ubuntu")
+	sshPassword := getEnv("SSH_PASSWORD", "ubuntu")
+	sshHostname := getEnv("SSH_HOSTNAME", "server")
+	useCoolify := getEnv("USE_COOLIFY", "true")
+	vmCPU := getEnv("VM_CPU", "2")
+	vmRAM := getEnv("VM_RAM", "2")
+	vmStorage := getEnv("VM_STORAGE", "20")
 
-services:
-  ubuntu-ssh:
-    image: %s:%s
-    runtime: runsc
-    privileged: true
-    deploy:
-      resources:
-        limits:
-          cpus: '%s'
-          memory: %s
-    storage_opt:
-      size: '%s'`,
-		docker_repo, latestVersion, "2.0", "2G", "60G")
-
-	encodedCompose := base64.StdEncoding.EncodeToString([]byte(composeContent))
-
-	newSvcReq := coolify.CreateServiceRequest{
-		ProjectUUID:      project_uuid,
-		ServerUUID:       server_uuid,
-		EnvironmentName:  coolify.String("production"),
-		EnvironmentUUID:  environment_uuid,
-		Name:             coolify.String(appName),
-		DockerComposeRaw: coolify.String(encodedCompose),
-		InstantDeploy:    coolify.Bool(true),
-		Urls: []coolify.ServiceUrlMapping{
-			{Name: "ubuntu-ssh", Url: fmt.Sprintf("%s:6080", domain)},
-		},
+	newAppReq := coolify.CreateDockerImageRequest{
+		ProjectUUID:             project_uuid,
+		ServerUUID:              server_uuid,
+		EnvironmentName:         "production",
+		EnvironmentUUID:         environment_uuid,
+		DockerRegistryImageName: docker_repo,
+		DockerRegistryImageTag:  latestVersion,
+		Name:                    coolify.String(appName),
+		Domains:                 coolify.String(domain),
+		PortsExposes:            coolify.String("6080"),
+		LimitsCPUs:              coolify.String("8"),
+		LimitsMemory:            coolify.String("6G"),
+		InstantDeploy:           coolify.Bool(true),
 	}
 
-	fmt.Printf("4. Attempting VPS deployment via Docker Compose: Name=%q, Domain=%q...\n", appName, domain)
-	resp, err := client.Services.Create(ctx, newSvcReq)
+	fmt.Printf("4. Attempting VPS deployment via Docker Image: Name=%q, Domain=%q...\n", appName, domain)
+	resp, err := client.Applications.CreateDockerImage(ctx, newAppReq)
 	if err != nil {
 		if apiErr, ok := err.(*coolify.Error); ok {
 			fmt.Printf("   Create Failed (expected for mock parameters): Status Code = %d\n", apiErr.StatusCode)
@@ -153,59 +161,58 @@ services:
 			log.Printf("   Unexpected error: %v\n", err)
 		}
 	} else {
-		fmt.Printf("   Service registered successfully! Assigned UUID: %s\n", resp.UUID)
+		fmt.Printf("   Application registered successfully! Assigned UUID: %s\n", resp.UUID)
 
-		// Create the three requested environment variables
-		fmt.Println("\n   Creating service environment variables...")
-		envVariables := []coolify.CreateServiceEnvRequest{
-			{Key: "SSH_USER", Value: "ubuntu", IsLiteral: true},
-			{Key: "SSH_PASSWORD", Value: "ubuntu", IsLiteral: true},
-			{Key: "SSH_HOSTNAME", Value: "vps", IsLiteral: true},
+		// Create the requested environment variables
+		fmt.Println("\n   Creating application environment variables...")
+		envVariables := []coolify.CreateEnvRequest{
+			{Key: "TTYD_OUT_PORT", Value: ttydOutPort, IsLiteral: true},
+			{Key: "TTYD_USER", Value: ttydUser, IsLiteral: true},
+			{Key: "TTYD_PASSWORD", Value: ttydPassword, IsLiteral: true},
+			{Key: "SSH_OUT_PORT", Value: sshOutPort, IsLiteral: true},
+			{Key: "SSH_USER", Value: sshUser, IsLiteral: true},
+			{Key: "SSH_PASSWORD", Value: sshPassword, IsLiteral: true},
+			{Key: "SSH_HOSTNAME", Value: sshHostname, IsLiteral: true},
+			{Key: "USE_COOLIFY", Value: useCoolify, IsLiteral: true},
+			{Key: "VM_CPU", Value: vmCPU, IsLiteral: true},
+			{Key: "VM_RAM", Value: vmRAM, IsLiteral: true},
+			{Key: "VM_STORAGE", Value: vmStorage, IsLiteral: true},
 		}
 
-		var sshPasswordEnvUUID string
 		for _, envReq := range envVariables {
-			envResp, envErr := client.Services.CreateEnv(ctx, resp.UUID, envReq)
+			envResp, envErr := client.Applications.CreateEnv(ctx, resp.UUID, envReq)
 			if envErr != nil {
 				fmt.Printf("   Warning: Failed to create env variable %s: %v\n", envReq.Key, envErr)
 			} else {
 				fmt.Printf("   - Environment variable %s created successfully (UUID: %s)\n", envReq.Key, envResp.UUID)
-				if envReq.Key == "SSH_PASSWORD" {
-					sshPasswordEnvUUID = envResp.UUID
-				}
 			}
 		}
 
-		// 5. Stop the service after a 20-second delay
-		fmt.Println("\n5. Delaying 20 seconds before stopping the service...")
-		time.Sleep(20 * time.Second)
+		// // 5. Stop the application after a 20-second delay
+		// fmt.Println("\n5. Delaying 20 seconds before stopping the application...")
+		// time.Sleep(20 * time.Second)
 
-		fmt.Printf("   Stopping service %s...\n", resp.UUID)
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer stopCancel()
+		// fmt.Printf("   Stopping application %s...\n", resp.UUID)
+		// stopCtx, stopCancel := context.WithTimeout(context.Background(), 20*time.Second)
+		// defer stopCancel()
+		// err = client.Applications.Stop(stopCtx, resp.UUID)
+		// if err != nil {
+		// 	log.Printf("   Failed to stop application: %v\n", err)
+		// } else {
+		// 	fmt.Println("   Application stopped successfully!")
+		// }
 
-		err = client.Services.Stop(stopCtx, resp.UUID)
-		if err != nil {
-			log.Printf("   Failed to stop service: %v\n", err)
-		} else {
-			fmt.Println("   Service stopped successfully!")
-		}
-
-		// 6. Update SSH_PASSWORD env to "ubuntu-ok"
-		fmt.Println("\n6. Updating SSH_PASSWORD to \"ubuntu-ok\"...")
-		if sshPasswordEnvUUID == "" {
-			fmt.Println("   Warning: SSH_PASSWORD UUID not found, skipping update.")
-		} else {
-			updatedEnv, updateErr := client.Services.UpdateEnv(ctx, resp.UUID, coolify.UpdateServiceEnvRequest{
-				Key:       "SSH_PASSWORD",
-				Value:     "ubuntu-ok",
-				IsLiteral: true,
-			})
-			if updateErr != nil {
-				log.Printf("   Failed to update SSH_PASSWORD: %v\n", updateErr)
-			} else {
-				fmt.Printf("   SSH_PASSWORD updated successfully (UUID: %s, new value: ubuntu-ok)\n", updatedEnv.UUID)
-			}
-		}
+		// // 6. Update SSH_PASSWORD env to "ubuntu-ok"
+		// fmt.Println("\n6. Updating SSH_PASSWORD to \"ubuntu-ok\"...")
+		// updatedEnv, updateErr := client.Applications.UpdateEnv(ctx, resp.UUID, coolify.UpdateEnvRequest{
+		// 	Key:       "SSH_PASSWORD",
+		// 	Value:     "ubuntu-ok",
+		// 	IsLiteral: true,
+		// })
+		// if updateErr != nil {
+		// 	log.Printf("   Failed to update SSH_PASSWORD: %v\n", updateErr)
+		// } else {
+		// 	fmt.Printf("   SSH_PASSWORD updated successfully (UUID: %s, new value: ubuntu-ok)\n", updatedEnv.UUID)
+		// }
 	}
 }

@@ -386,9 +386,9 @@ type UpdateEnvRequest struct {
 }
 
 // UpdateEnv creates or updates a specific environment variable for an application.
-func (s *ApplicationsService) UpdateEnv(ctx context.Context, uuid string, envUUID string, reqBody UpdateEnvRequest) (*EnvironmentVariable, error) {
-	path := fmt.Sprintf("applications/%s/envs/%s", uuid, envUUID)
-	req, err := s.client.newRequest(http.MethodPost, path, reqBody)
+func (s *ApplicationsService) UpdateEnv(ctx context.Context, uuid string, reqBody UpdateEnvRequest) (*EnvironmentVariable, error) {
+	path := fmt.Sprintf("applications/%s/envs", uuid)
+	req, err := s.client.newRequest(http.MethodPatch, path, reqBody)
 	if err != nil {
 		return nil, err
 	}
