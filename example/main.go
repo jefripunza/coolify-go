@@ -114,9 +114,9 @@ func main() {
 	sshPassword := getEnv("SSH_PASSWORD", "ubuntu")
 	sshHostname := getEnv("SSH_HOSTNAME", "server")
 	useCoolify := getEnv("USE_COOLIFY", "true")
-	vmCPU := getEnv("VM_CPU", "2")
-	vmRAM := getEnv("VM_RAM", "2")
-	vmStorage := getEnv("VM_STORAGE", "20")
+	vmCPU := getEnv("VM_CPU", "8")
+	vmRAM := getEnv("VM_RAM", "8")
+	vmStorage := getEnv("VM_STORAGE", "40")
 
 	newAppReq := coolify.CreateDockerImageRequest{
 		ProjectUUID:             project_uuid,
