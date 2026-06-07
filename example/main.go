@@ -107,9 +107,8 @@ func main() {
 	}
 
 	newAppReq := coolify.CreateDockerImageRequest{
-		ProjectUUID:             project_uuid,
 		ServerUUID:              server_uuid,
-		EnvironmentName:         "production",
+		ProjectUUID:             project_uuid,
 		EnvironmentUUID:         environment_uuid,
 		DockerRegistryImageName: docker_repo,
 		DockerRegistryImageTag:  latestVersion,
@@ -117,6 +116,7 @@ func main() {
 		Domains:                 coolify.String(domain),
 		PortsExposes:            coolify.String("6080"),
 		InstantDeploy:           coolify.Bool(false),
+		CustomDockerRunOptions:  coolify.String("--privileged"),
 	}
 
 	fmt.Printf("4. Attempting VPS deployment via Docker Image: Name=%q, Domain=%q...\n", appName, domain)
