@@ -178,6 +178,20 @@ func main() {
 			}
 		}
 
+		// tambah volume ke <timestamp>-openclaw:/ (root)
+		volumeName := fmt.Sprintf("%d-openclaw", timestamp)
+		fmt.Printf("\n   Adding persistent volume storage %s mapped to / ...\n", volumeName)
+		_, storageErr := client.Applications.CreateStorage(ctx, resp.UUID, coolify.CreateStorageRequest{
+			Type:      "persistent",
+			Name:      coolify.String(volumeName),
+			MountPath: "/",
+		})
+		if storageErr != nil {
+			log.Printf("   Warning: Failed to create persistent volume storage: %v\n", storageErr)
+		} else {
+			fmt.Printf("   Persistent volume storage %s created successfully!\n", volumeName)
+		}
+
 		// Deploy the application manually
 		fmt.Printf("\n5. Deploying application %s...\n", resp.UUID)
 		deployResp, deployErr := client.Deployments.Deploy(ctx, true, resp.UUID, nil)

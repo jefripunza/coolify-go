@@ -322,6 +322,76 @@ func TestSystem_VersionAndHealth(t *testing.T) {
 	}
 }
 
+func TestApplications_Storage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/storages") {
+			var req CreateStorageRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Errorf("Failed to decode CreateStorageRequest: %v", err)
+			}
+			if req.MountPath != "/" || *req.Name != "test-volume" {
+				t.Errorf("Unexpected CreateStorageRequest: %+v", req)
+			}
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"uuid":"storage-123","name":"test-volume","mount_path":"/"}`))
+		} else if r.Method == http.MethodPatch && strings.HasSuffix(r.URL.Path, "/storages") {
+			var req UpdateStorageRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Errorf("Failed to decode UpdateStorageRequest: %v", err)
+			}
+			if *req.MountPath != "/new" {
+				t.Errorf("Unexpected UpdateStorageRequest: %+v", req)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"uuid":"storage-123","name":"test-volume","mount_path":"/new"}`))
+		} else if r.Method == http.MethodDelete && strings.HasSuffix(r.URL.Path, "/storages/storage-123") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"message":"Storage deleted."}`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "")
+	ctx := context.Background()
+
+	// 1. Test CreateStorage
+	createResp, err := client.Applications.CreateStorage(ctx, "app-123", CreateStorageRequest{
+		Type:      "persistent",
+		Name:      String("test-volume"),
+		MountPath: "/",
+	})
+	if err != nil {
+		t.Fatalf("Unexpected CreateStorage error: %v", err)
+	}
+	if createResp["uuid"] != "storage-123" {
+		t.Errorf("Expected UUID 'storage-123', got %v", createResp["uuid"])
+	}
+
+	// 2. Test UpdateStorage
+	updateResp, err := client.Applications.UpdateStorage(ctx, "app-123", UpdateStorageRequest{
+		Type:      "persistent",
+		MountPath: String("/new"),
+	})
+	if err != nil {
+		t.Fatalf("Unexpected UpdateStorage error: %v", err)
+	}
+	if updateResp["mount_path"] != "/new" {
+		t.Errorf("Expected mount_path '/new', got %v", updateResp["mount_path"])
+	}
+
+	// 3. Test DeleteStorage
+	msg, err := client.Applications.DeleteStorage(ctx, "app-123", "storage-123")
+	if err != nil {
+		t.Fatalf("Unexpected DeleteStorage error: %v", err)
+	}
+	if msg != "Storage deleted." {
+		t.Errorf("Expected message 'Storage deleted.', got %q", msg)
+	}
+}
+
 func TestIntegration_RealCoolify(t *testing.T) {
 	loadEnv()
 

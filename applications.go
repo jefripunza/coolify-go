@@ -458,3 +458,67 @@ func (s *ApplicationsService) ListTaskExecutions(ctx context.Context, uuid strin
 	_, err = s.client.do(ctx, req, &executions)
 	return executions, err
 }
+
+// CreateStorageRequest represents parameters to create a new storage configuration for an application.
+type CreateStorageRequest struct {
+	Type        string  `json:"type"`                   // "persistent" or "file"
+	Name        *string `json:"name,omitempty"`         // persistent only, required for persistent
+	MountPath   string  `json:"mount_path"`             // container mount path
+	HostPath    *string `json:"host_path,omitempty"`    // persistent only, optional
+	Content     *string `json:"content,omitempty"`      // file only, optional
+	IsDirectory *bool   `json:"is_directory,omitempty"`  // file only, default false
+	FSPath      *string `json:"fs_path,omitempty"`      // required when is_directory is true
+}
+
+// UpdateStorageRequest represents parameters to update storage configuration for an application.
+type UpdateStorageRequest struct {
+	UUID                    *string `json:"uuid,omitempty"`                      // The UUID of the storage (preferred)
+	ID                      *int    `json:"id,omitempty"`                        // The ID of the storage (deprecated, use uuid instead)
+	Type                    string  `json:"type"`                                // The type of storage: persistent or file
+	IsPreviewSuffixEnabled *bool   `json:"is_preview_suffix_enabled,omitempty"` // Whether to add -pr-N suffix
+	Name                    *string `json:"name,omitempty"`                      // The volume name (persistent only, not allowed for read-only storages)
+	MountPath               *string `json:"mount_path,omitempty"`                // The container mount path (not allowed for read-only storages)
+	HostPath                *string `json:"host_path,omitempty"`                 // The host path (persistent only, not allowed for read-only storages)
+	Content                 *string `json:"content,omitempty"`                   // The file content (file only, not allowed for read-only storages)
+}
+
+// CreateStorage creates a persistent storage or file storage for an application.
+func (s *ApplicationsService) CreateStorage(ctx context.Context, uuid string, reqBody CreateStorageRequest) (map[string]interface{}, error) {
+	path := fmt.Sprintf("applications/%s/storages", uuid)
+	req, err := s.client.newRequest(http.MethodPost, path, reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp map[string]interface{}
+	_, err = s.client.do(ctx, req, &resp)
+	return resp, err
+}
+
+// UpdateStorage updates a persistent storage or file storage by application UUID.
+func (s *ApplicationsService) UpdateStorage(ctx context.Context, uuid string, reqBody UpdateStorageRequest) (map[string]interface{}, error) {
+	path := fmt.Sprintf("applications/%s/storages", uuid)
+	req, err := s.client.newRequest(http.MethodPatch, path, reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp map[string]interface{}
+	_, err = s.client.do(ctx, req, &resp)
+	return resp, err
+}
+
+// DeleteStorage deletes a persistent storage or file storage by application UUID and storage UUID.
+func (s *ApplicationsService) DeleteStorage(ctx context.Context, uuid string, storageUUID string) (string, error) {
+	path := fmt.Sprintf("applications/%s/storages/%s", uuid, storageUUID)
+	req, err := s.client.newRequest(http.MethodDelete, path, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var resp struct {
+		Message string `json:"message"`
+	}
+	_, err = s.client.do(ctx, req, &resp)
+	return resp.Message, err
+}
