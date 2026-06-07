@@ -162,9 +162,9 @@ func main() {
 		envVariables := []coolify.CreateEnvRequest{
 			{Key: "TTYD_USER", Value: ttydUser, IsLiteral: true},
 			{Key: "TTYD_PASSWORD", Value: ttydPassword, IsLiteral: true},
+			{Key: "SSH_HOSTNAME", Value: sshHostname, IsLiteral: true},
 			{Key: "SSH_USER", Value: sshUser, IsLiteral: true},
 			{Key: "SSH_PASSWORD", Value: sshPassword, IsLiteral: true},
-			{Key: "SSH_HOSTNAME", Value: sshHostname, IsLiteral: true},
 			{Key: "SAWANG_CLOUD_API_KEY", Value: sawangApiKey, IsLiteral: true},
 			{Key: "SAWANG_CLOUD_BASE_URL", Value: sawangBaseUrl, IsLiteral: true},
 		}
@@ -179,12 +179,12 @@ func main() {
 		}
 
 		// tambah volume ke <timestamp>-openclaw:/ (root)
-		volumeName := fmt.Sprintf("%d-openclaw", timestamp)
+		volumeName := fmt.Sprintf("%d-dot-openclaw", timestamp)
 		fmt.Printf("\n   Adding persistent volume storage %s mapped to / ...\n", volumeName)
 		_, storageErr := client.Applications.CreateStorage(ctx, resp.UUID, coolify.CreateStorageRequest{
 			Type:      "persistent",
 			Name:      coolify.String(volumeName),
-			MountPath: "/",
+			MountPath: fmt.Sprintf("/home/%s", sshUser),
 		})
 		if storageErr != nil {
 			log.Printf("   Warning: Failed to create persistent volume storage: %v\n", storageErr)
