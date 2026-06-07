@@ -87,13 +87,13 @@ func main() {
 
 	// 4. Demonstrating custom Docker Image application creation
 	timestamp := time.Now().Unix()
-	appName := fmt.Sprintf("vps-qemu-server-%d", timestamp)
+	appName := fmt.Sprintf("tester-%d", timestamp)
 
 	domain_terminal := fmt.Sprintf("https://vps-terminal-%d.%s", timestamp, web_host)
-	domain_coolify := fmt.Sprintf("https://vps-coolify-%d.%s:8000", timestamp, web_host)
+	domain_app := fmt.Sprintf("https://vps-app-%d.%s:8080", timestamp, web_host)
 
 	// join string using comma
-	domain := strings.Join([]string{domain_terminal, domain_coolify}, ",")
+	domain := strings.Join([]string{domain_terminal, domain_app}, ",")
 
 	// Query the Docker Hub repository for the latest version tag.
 	latestVersion := "latest" // Fallback default version
@@ -106,18 +106,6 @@ func main() {
 		fmt.Printf("   Successfully retrieved latest version tag: %s\n", latestVersion)
 	}
 
-	ttydOutPort := getEnv("TTYD_OUT_PORT", "6080")
-	ttydUser := getEnv("TTYD_USER", "ubuntu")
-	ttydPassword := getEnv("TTYD_PASSWORD", "ubuntu")
-	sshOutPort := getEnv("SSH_OUT_PORT", "2222")
-	sshUser := getEnv("SSH_USER", "ubuntu")
-	sshPassword := getEnv("SSH_PASSWORD", "ubuntu")
-	sshHostname := getEnv("SSH_HOSTNAME", "server")
-	useCoolify := getEnv("USE_COOLIFY", "true")
-	vmCPU := getEnv("VM_CPU", "8")
-	vmRAM := getEnv("VM_RAM", "8")
-	vmStorage := getEnv("VM_STORAGE", "40")
-
 	newAppReq := coolify.CreateDockerImageRequest{
 		ProjectUUID:             project_uuid,
 		ServerUUID:              server_uuid,
@@ -128,9 +116,7 @@ func main() {
 		Name:                    coolify.String(appName),
 		Domains:                 coolify.String(domain),
 		PortsExposes:            coolify.String("6080"),
-		LimitsCPUs:              coolify.String("8"),
-		LimitsMemory:            coolify.String("6G"),
-		InstantDeploy:           coolify.Bool(true),
+		InstantDeploy:           coolify.Bool(false),
 	}
 
 	fmt.Printf("4. Attempting VPS deployment via Docker Image: Name=%q, Domain=%q...\n", appName, domain)
@@ -163,20 +149,24 @@ func main() {
 	} else {
 		fmt.Printf("   Application registered successfully! Assigned UUID: %s\n", resp.UUID)
 
+		ttydUser := getEnv("TTYD_USER", "ubuntu")
+		ttydPassword := getEnv("TTYD_PASSWORD", "ubuntu")
+		sshUser := getEnv("SSH_USER", "ubuntu")
+		sshPassword := getEnv("SSH_PASSWORD", "ubuntu")
+		sshHostname := getEnv("SSH_HOSTNAME", "server")
+		sawangApiKey := getEnv("SAWANG_CLOUD_API_KEY", "-")
+		sawangBaseUrl := getEnv("SAWANG_CLOUD_BASE_URL", "http://localhost:20128/v1")
+
 		// Create the requested environment variables
 		fmt.Println("\n   Creating application environment variables...")
 		envVariables := []coolify.CreateEnvRequest{
-			{Key: "TTYD_OUT_PORT", Value: ttydOutPort, IsLiteral: true},
 			{Key: "TTYD_USER", Value: ttydUser, IsLiteral: true},
 			{Key: "TTYD_PASSWORD", Value: ttydPassword, IsLiteral: true},
-			{Key: "SSH_OUT_PORT", Value: sshOutPort, IsLiteral: true},
 			{Key: "SSH_USER", Value: sshUser, IsLiteral: true},
 			{Key: "SSH_PASSWORD", Value: sshPassword, IsLiteral: true},
 			{Key: "SSH_HOSTNAME", Value: sshHostname, IsLiteral: true},
-			{Key: "USE_COOLIFY", Value: useCoolify, IsLiteral: true},
-			{Key: "VM_CPU", Value: vmCPU, IsLiteral: true},
-			{Key: "VM_RAM", Value: vmRAM, IsLiteral: true},
-			{Key: "VM_STORAGE", Value: vmStorage, IsLiteral: true},
+			{Key: "SAWANG_CLOUD_API_KEY", Value: sawangApiKey, IsLiteral: true},
+			{Key: "SAWANG_CLOUD_BASE_URL", Value: sawangBaseUrl, IsLiteral: true},
 		}
 
 		for _, envReq := range envVariables {
@@ -186,6 +176,15 @@ func main() {
 			} else {
 				fmt.Printf("   - Environment variable %s created successfully (UUID: %s)\n", envReq.Key, envResp.UUID)
 			}
+		}
+
+		// Deploy the application manually
+		fmt.Printf("\n5. Deploying application %s...\n", resp.UUID)
+		deployResp, deployErr := client.Deployments.Deploy(ctx, true, resp.UUID, nil)
+		if deployErr != nil {
+			log.Printf("   Failed to trigger deployment: %v\n", deployErr)
+		} else {
+			fmt.Printf("   Deployment triggered successfully! Message: %s\n", deployResp.Message)
 		}
 
 		// // 5. Stop the application after a 20-second delay

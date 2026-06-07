@@ -13,7 +13,7 @@ type DeploymentsService struct {
 
 // DeployRequest represents the parameters for deploying an application by its UUID or tag.
 type DeployRequest struct {
-	ApplicationUUID string  `json:"application_uuid"`
+	ApplicationUUID string  `json:"uuid"`
 	Tag             *string `json:"tag,omitempty"`
 }
 
