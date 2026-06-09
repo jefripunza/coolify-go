@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"coolify"
+	"github.com/jefripunza/coolify-go"
 )
 
 func getEnv(key, defaultValue string) string {

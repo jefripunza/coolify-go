@@ -1,4 +1,4 @@
-module coolify
+module github.com/jefripunza/coolify-go
 
 go 1.25.6
 
