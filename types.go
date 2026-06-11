@@ -123,6 +123,7 @@ type ApplicationDeploymentQueue struct {
 // Environment represents a Coolify environment resource.
 type Environment struct {
 	ID          int       `json:"id"`
+	UUID        string    `json:"uuid"`
 	Name        string    `json:"name"`
 	ProjectID   int       `json:"project_id"`
 	Description *string   `json:"description,omitempty"`
